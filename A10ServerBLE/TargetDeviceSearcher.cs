@@ -35,7 +35,7 @@ namespace A10ServerBLE
             }
             // Logger.log($"BLEDevice detected. DeviceName: {device.Name}");
 
-            var targetDevice = TargetDeviceFactory.factory(device);
+            var targetDevice = await　TargetDeviceFactory.factory(device);
 
             if(targetDevice != null)
             {

@@ -10,58 +10,45 @@ namespace A10ServerBLE
 {
     public class TargetDeviceFactory
     {
-        public static ITargetDevice factory(BluetoothLEDevice device)
+        public static async Task<ITargetDevice> factory(BluetoothLEDevice device)
         {
-            return buildVorzeDevice(device);
+            return await buildVorzeDevice(device);
         }
-
-        private static ITargetDevice buildVorzeDevice(BluetoothLEDevice device)
+        private static async Task<ITargetDevice> buildVorzeDevice(BluetoothLEDevice device)
         {
             string vorzeServiceUuidStr = "40ee1111-63ec-4b7f-8ce7-712efd55b90e";
             string vorzeCharactersticUuidStr = "40ee2222-63ec-4b7f-8ce7-712efd55b90e";
-            string charactersticDescriptionName = "nls_command";
 
             IDictionary<string, Type> deviceMap = new Dictionary<string, Type>() {
-                { "VorzePiston", typeof(VorzeA10Piston)},
-                { "CycSA", typeof(VorzeA10Cyclone)},
-                { "UFOSA", typeof(VorzeUFOSA)},
+        { "VorzePiston", typeof(VorzeA10Piston)},
+        { "CycSA", typeof(VorzeA10Cyclone)},
+        { "UFOSA", typeof(VorzeUFOSA)},
+    };
 
-            };
+            if (device == null) return null;
 
-
-            ITargetDevice concreateDevice = null;
-
-
-            if (device == null) { return null; }
-
-
-
-            GattDeviceServicesResult services = device.GetGattServicesForUuidAsync(new Guid(vorzeServiceUuidStr)).GetResults();
-
-            var service = services != null && services.Services.Count > 0 ? services.Services[0] : null;
-
-            if(service == null) { return null;  }
+            var servicesResult = await device.GetGattServicesForUuidAsync(new Guid(vorzeServiceUuidStr));
+            var service = servicesResult?.Services.Count > 0 ? servicesResult.Services[0] : null;
+            if (service == null) return null;
 
             Logger.log($"DeviceName: {service.Device.Name}");
 
-            var characteristics = service.GetCharacteristicsForUuidAsync(new Guid(vorzeCharactersticUuidStr)).GetResults();
+            var charResult = await service.GetCharacteristicsForUuidAsync(new Guid(vorzeCharactersticUuidStr));
+            if (charResult == null || charResult.Characteristics.Count < 1) return null;
 
-            if(characteristics == null || characteristics.Characteristics.Count < 1) { return null; }
+            var characteristic = charResult.Characteristics[0];
 
-            var characterstic = characteristics.Characteristics[0];
-            if (characterstic != null)
+            foreach (var key in deviceMap.Keys)
             {
-                foreach(var key in deviceMap.Keys)
+                if (service.Device.Name.Contains(key))
                 {
-                    if (service.Device.Name.Contains(key))
-                    {
-                        concreateDevice = Activator.CreateInstance(deviceMap[key]) as ITargetDevice;
-                        concreateDevice.init(characterstic);
-                        break;
-                    }
+                    var deviceInstance = Activator.CreateInstance(deviceMap[key]) as ITargetDevice;
+                    deviceInstance?.init(characteristic);
+                    return deviceInstance;
                 }
             }
-            return concreateDevice;
+
+            return null;
         }
     }
 }
